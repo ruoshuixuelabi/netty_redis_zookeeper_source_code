@@ -18,6 +18,8 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 public class NettyDiscardServer {
     private final int serverPort;
+    //服务引导类是一个组装和集成器，职责是将不同的Netty组件组装在一起。
+    // 此外，ServerBootstrap能够按照应用场景的需要为组件设置好基础性的参数，最后帮助快速实现Netty服务器的监听和启动
     ServerBootstrap b = new ServerBootstrap();
 
     public NettyDiscardServer(int port) {
@@ -26,9 +28,10 @@ public class NettyDiscardServer {
 
     public void runServer() {
         //创建reactor 线程组
+        //第一个负责服务器通道新连接的IO事件的监听，可以形象地理解为“包工头”角色
         EventLoopGroup bossLoopGroup = new NioEventLoopGroup(1);
+        //第二个主要负责传输通道的IO事件的处理和数据传输，可以形象地理解为“工人”角色
         EventLoopGroup workerLoopGroup = new NioEventLoopGroup();
-
         try {
             //1 设置reactor 线程组
             b.group(bossLoopGroup, workerLoopGroup);
@@ -41,7 +44,6 @@ public class NettyDiscardServer {
             b.option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
             b.childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
             b.childOption(ChannelOption.TCP_NODELAY, true);
-
             //5 装配子通道流水线
             b.childHandler(new ChannelInitializer<SocketChannel>() {
                 //有连接到达时会创建一个channel
@@ -49,29 +51,22 @@ public class NettyDiscardServer {
                     // pipeline管理子通道channel中的Handler
                     // 向子channel流水线添加一个handler处理器
 //                    ch.pipeline().addLast(new NettyDiscardHandler2());
+                    //Handler的作用是对应到IO事件，完成IO事件的业务处理
                     ch.pipeline().addLast(new NettyDiscardHandler());
                 }
             });
             // 6 开始绑定server
             // 通过调用sync同步方法阻塞直到绑定成功
             ChannelFuture channelFuture = b.bind();
-
             channelFuture.addListener(l -> {
-
                 if (l.isSuccess())
-                    Logger.info(" 服务器端口绑定 正常: " +
-                            channelFuture.channel().localAddress());
+                    Logger.info(" 服务器端口绑定 正常: " + channelFuture.channel().localAddress());
                 else
-                    Logger.info(" 服务器端口绑定 失败: " +
-                            channelFuture.channel().localAddress());
-
+                    Logger.info(" 服务器端口绑定 失败: " + channelFuture.channel().localAddress());
             });
-
             channelFuture.sync();
-
             Logger.info(" 服务器启动成功，监听端口: " +
                     channelFuture.channel().localAddress());
-
             // 7 等待通道关闭的异步任务结束
             // 服务监听通道会一直等待通道关闭的异步任务结束
             ChannelFuture closeFuture = channelFuture.channel().closeFuture();
@@ -84,7 +79,6 @@ public class NettyDiscardServer {
             workerLoopGroup.shutdownGracefully();
             bossLoopGroup.shutdownGracefully();
         }
-
     }
 
     public static void main(String[] args) throws InterruptedException {
